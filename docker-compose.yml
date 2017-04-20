@@ -1,0 +1,12 @@
+dbdata:
+  image: 3manuek/postgresql:10
+  volumes:
+    - /opt/pg10
+  command: true
+
+db:
+  image: 3manuek/postgresql:10
+  volumes_from:
+    - dbdata
+  ports:
+    - "5432:5432"
