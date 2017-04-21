@@ -13,23 +13,18 @@ RUN git clone https://github.com/postgres/postgres.git
 
 RUN cd postgres && \
     ./configure --prefix=/opt/pg10 && \
-    make 
+    make world && \
+    make install-world && \
+    make -C contrib install
 
-USER root
-RUN cd postgres/contrib && \
-    make all && \
-    make install && \
-    cd ..
-
-RUN cd postgres && make install
+#RUN cd postgres && make install
 RUN useradd postgres 
 RUN chown -R postgres:  /opt/pg10/
 
 RUN INCUBATOR_VER=${INCUBATOR_VER} pwd
 
 USER postgres
-# export LC_CTYPE=en_US.UTF-8
-#CMD ["/opt/pg10/bin/initdb", "-D", "/opt/pg10/data"]
+
 #RUN mkdir -p /var/run/postgresql && chown -R postgres /var/run/postgresql
 RUN /opt/pg10/bin/initdb -D /opt/pg10/data
 #RUN chown postgres: -R /opt/pg10/data/
@@ -39,8 +34,8 @@ RUN echo "host all  all    0.0.0.0/0  md5" >> /opt/pg10/data/pg_hba.conf
 #RUN echo "listen_addresses='*'" >> /opt/pg10/data/postgresql.conf
 
 VOLUME  ["/opt/pg10/data"]
-
-ENTRYPOINT ["docker-entrypoint.sh"]
+COPY docker-entrypoint.sh /sbin/docker-entrypoint.sh
+ENTRYPOINT ["/sbin/docker-entrypoint.sh"]
 EXPOSE 5432
 
 CMD ["/opt/pg10/bin/postgres", "-D", "/opt/pg10/data", "-c", "config_file=/opt/pg10/data/postgresql.conf"]

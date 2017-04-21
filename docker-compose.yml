@@ -1,12 +1,14 @@
-dbdata:
-  image: 3manuek/postgresql:10
+postgres10:
+  image: 3manuek/postgres10
+  restart: always
   volumes:
-    - /opt/pg10
-  command: true
+    - /opt/pg10/data
+#  command: true
 
 db:
-  image: 3manuek/postgresql:10
+  image: 3manuek/postgres10
   volumes_from:
-    - dbdata
+    - postgres10
   ports:
     - "5432:5432"
+
