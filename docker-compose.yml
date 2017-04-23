@@ -1,14 +1,41 @@
-postgres10:
-  image: 3manuek/postgres10
-  restart: always
-  volumes:
-    - /opt/pg10/data
+version: "2"
+services:
+  db:
+    image: 3manuek/postgres10
+    restart: always
+    ports:
+      - "7777:5432"
+    networks:
+      clusterpg:
+        aliases:
+          - db1
+    volumes:
+      - /opt/pg10/data
+  db2:
+    image: 3manuek/postgres10
+    restart: always
+    ports:
+      - "8888:5432"
+    networks:
+      clusterpg:
+        aliases:
+          - db2
+    volumes:
+      - /opt/pg10/data
 #  command: true
+volumes:
+  data: {} 
 
-db:
-  image: 3manuek/postgres10
-  volumes_from:
-    - postgres10
-  ports:
-    - "5432:5432"
+networks:
+  clusterpg:
+
+
+
+#db:
+#  image: 3manuek/postgres10
+#  volumes_from:
+#    - postgres10
+#  ports:
+#    - "5432:5432"
+#  command: true
 
