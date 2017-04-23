@@ -1,0 +1,8 @@
+SELECT pg_create_logical_replication_slot('log_slot', 'test_decoding');
+SELECT slot_name, plugin, slot_type, database, active, restart_lsn, confirmed_flush_lsn FROM pg_replication_slots;
+CREATE TABLE data(id serial primary key, data text);
+INSERT INTO data(id, data) SELECT i, random()::text FROM generate_series(1,10) i(i);
+SELECT * FROM pg_logical_slot_peek_changes('log_slot', NULL, NULL);
+SELECT * FROM pg_logical_slot_get_changes('log_slot', NULL, NULL);
+SELECT pg_drop_replication_slot('log_slot');
+DROP TABLE data;

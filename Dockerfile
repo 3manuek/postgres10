@@ -32,16 +32,18 @@ RUN /opt/pg10/bin/initdb -D /opt/pg10/data
 #RUN chown postgres: -R /opt/pg10/data/
 USER postgres 
 #RUN sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /opt/pg10/data/postgresql.conf 
-RUN echo "listen_addresses = '*'" >> /opt/pg10/data/postgresql.conf 
-RUN echo "wal_level = 'logical'" >> /opt/pg10/data/postgresql.conf
-RUN echo "track_commit_timestamp = on" >> /opt/pg10/data/postgresql.conf
-
-RUN echo "host all  all    0.0.0.0/0  md5" >> /opt/pg10/data/pg_hba.conf
-#RUN echo "listen_addresses='*'" >> /opt/pg10/data/postgresql.conf
 
 VOLUME  ["/opt/pg10/data"]
-#COPY docker-entrypoint.sh /sbin/docker-entrypoint.sh
-#ENTRYPOINT ["/sbin/docker-entrypoint.sh"]
+
+
+#RUN echo "listen_addresses = '*'" >> /opt/pg10/data/postgresql.conf 
+#RUN echo "wal_level = 'logical'" >> /opt/pg10/data/postgresql.conf
+#RUN echo "track_commit_timestamp = on" >> /opt/pg10/data/postgresql.conf
+
+#RUN echo "host all  all    0.0.0.0/0  trust" >> /opt/pg10/data/pg_hba.conf
+
+COPY docker-entrypoint.sh /sbin/docker-entrypoint.sh
+ENTRYPOINT ["/sbin/docker-entrypoint.sh"]
 EXPOSE 5432
 
 USER postgres 
