@@ -1,0 +1,145 @@
+  \dRp[+] [PATTERN]      list replication publications
+  \dRs[+] [PATTERN]      list replication subscriptions
+
+\dRp+
+\dRs+
+
+percona=# select pg_drop_replication_slot('s_data');
+ERROR:  replication slot "s_data" is active for PID 2317
+
+dropping the subscriber actually drops the slot on the origin. 
+
+----
+
+./pgaccess data1 postgres
+
+CREATE DATABASE percona;
+\c percona 
+CREATE TABLE data AS SELECT i, clock_timestamp() as tt 
+  FROM generate_series(1,10) i(i);
+ALTER TABLE data ADD PRIMARY KEY(i);
+CREATE PUBLICATION p_data FOR TABLE data; 
+\q
+
+
+./pgaccess data2 postgres
+CREATE DATABASE percona;
+\c percona 
+CREATE SUBSCRIPTION s_data 
+  CONNECTION 'port=6666 user=ubuntu dbname=percona' 
+  PUBLICATION p_data WITH (COPY DATA, CREATE SLOT);
+\q
+
+./pgaccess data1 percona 
+select pg_drop_replication_slot('s_data');
+\q
+
+./pgaccess data2 percona 
+CREATE TABLE data 
+  (i integer PRIMARY KEY, 
+  tt timestamp with time zone, 
+  extra_col text); -- Hey, we need this data here 
+CREATE INDEX ON data (tt,extra_col);
+
+CREATE SUBSCRIPTION s_data 
+  CONNECTION 'port=6666 user=ubuntu dbname=percona' 
+  PUBLICATION p_data WITH (COPY DATA, CREATE SLOT);
+SELECT * FROM data;
+-- le wild hand inserting in the slave
+INSERT INTO data(i,tt,extra_col) VALUES (11,now(),$$I don't care$$);
+\q
+
+
+
+./pgaccess data1 percona 
+INSERT INTO data SELECT i, clock_timestamp() FROM generate_series(11,15) i(i);
+SELECT * FROM data WHERE i > 8;
+\q
+
+tail -f data2.log 
+
+bin/psql -p6666 -c "select * from pg_replication_slots" percona ; 
+bin/psql -p6667 -c "select * from pg_replication_origin_status os join pg_replication_origin ON (local_id = roident)" percona
+bin/psql -p6668 -c "select * from pg_replication_origin_status os join pg_replication_origin ON (local_id = roident)" percona
+
+
+./pgaccess data2 percona 
+SELECT * FROM data WHERE i > 8;
+DELETE FROM data WHERE i = 11;
+\q
+
+tail -f data2.log 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+postgres=# CREATE SUBSCRIPTION s_data CONNECTION 'port=6666 user=ubuntu dbname=percona' PUBLICATION p_data WITH (COPY DATA, CREATE SLOT);
+NOTICE:  created replication slot "s_data" on publisher
+ERROR:  relation "public.data" does not exist
+
+CREATE TABLE data (i integer PRIMARY KEY, tt timestamp with time zone );
+
+postgres=# drop subscription s_data;
+ERROR:  subscription "s_data" does not exist
+postgres=# CREATE SUBSCRIPTION s_data CONNECTION 'port=6666 user=ubuntu dbname=percona' PUBLICATION p_data WITH (COPY DATA, CREATE SLOT);
+ERROR:  could not create replication slot "s_data": ERROR:  replication slot "s_data" already exists
+
+postgres=# select * from pg_replication_slots ;
+ slot_name | plugin | slot_type | datoid | database | temporary | active | active_pid | xmin | catalog_xmin | restart_lsn | confirmed_flush_lsn 
+-----------+--------+-----------+--------+----------+-----------+--------+------------+------+--------------+-------------+---------------------
+(0 rows)
+
+postgres=# \df *drop*slot*
+                                    List of functions
+   Schema   |           Name           | Result data type | Argument data types |  Type  
+------------+--------------------------+------------------+---------------------+--------
+ pg_catalog | pg_drop_replication_slot | void             | name                | normal
+(1 row)
+
+
+postgres=# CREATE SUBSCRIPTION s_data CONNECTION 'port=6666 user=ubuntu dbname=percona' PUBLICATION p_data WITH (COPY DATA, CREATE SLOT);
+NOTICE:  created replication slot "s_data" on publisher
+NOTICE:  synchronized table states
+CREATE SUBSCRIPTION
+
+while true; do
+clear
+bin/psql -p6666 -c "select * from pg_replication_slots" percona ; 
+bin/psql -p6667 -c "select * from pg_replication_origin_status os join pg_replication_origin ON (local_id = roident)" percona
+sleep 2
+done
+
+2017-04-24 04:28:17.591 UTC [2910] DETAIL:  Key (i)=(31) already exists.
+2017-04-24 04:28:17.591 UTC [1803] LOG:  worker process: logical replication worker for subscription 16399 (PID 2910) exited with exit code 1
+2017-04-24 04:28:22.594 UTC [1810] LOG:  starting logical replication worker for subscription "s_data3"
+2017-04-24 04:28:22.597 UTC [2913] LOG:  logical replication apply for subscription s_data3 started
+2017-04-24 04:28:22.601 UTC [2913] ERROR:  duplicate key value violates unique constraint "data_pkey"
+2017-04-24 04:28:22.601 UTC [2913] DETAIL:  Key (i)=(31) already exists.
+2017-04-24 04:28:22.602 UTC [1803] LOG:  worker process: logical replication worker for subscription 16399 (PID 2913) exited with exit code 1
+
+2017-04-24 04:29:11.399 UTC [1803] LOG:  worker process: logical replication worker for subscription 16399 (PID 2944) exited with exit code 1
+2017-04-24 04:29:12.141 UTC [1810] LOG:  starting logical replication worker for subscription "s_data3"
+2017-04-24 04:29:12.143 UTC [2947] LOG:  logical replication apply for subscription s_data3 started
+
+percona=# select pg_logical_slot_peek_changes('s_data3','0/15FEED0',NULL);
+ERROR:  client sent proto_version=0 but we only support protocol 1 or lower
+CONTEXT:  slot "s_data3", output plugin "pgoutput", in the startup callback
+
+Inserted row but the advance is not working 
+percona=# select pg_replication_origin_advance('s_data3','0/15FEDF0');
+ERROR:  cache lookup failed for replication origin 's_data3'
+
+
+
+

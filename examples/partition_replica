@@ -1,0 +1,29 @@
+CREATE TABLE main (group_id char(2), stamp timestamp without time zone DEFAULT now(), payload jsonb) PARTITION BY LIST(group_id);
+CREATE TABLE main_p0 PARTITION OF main
+  FOR VALUES IN ('P0');
+CREATE TABLE main_p0 PARTITION OF main
+  FOR VALUES IN ('P1');
+CREATE INDEX ix_main_shard_p0_key ON main_p0 (stamp,(payload->>'key'));
+CREATE INDEX ix_main_shard_p1_key ON main_p1 (stamp,(payload->>'key'));
+
+
+-- On server 0
+CREATE PUBLICATION p_p0
+FOR TABLE main_P0;
+CREATE SUBSCRIPTION s_main_1
+  CONNECTION 'port=6666 user=ubuntu dbname=percona' 
+  PUBLICATION p_p1 
+  WITH (NOCOPY DATA);
+
+
+-- On server 1
+CREATE PUBLICATION p_p1
+FOR TABLE main_P1;
+CREATE SUBSCRIPTION s_main_0
+  CONNECTION 'port=6666 user=ubuntu dbname=percona' 
+  PUBLICATION p_p0 
+  WITH (NOCOPY DATA);
+
+INSERT INTO main (group_id, payload)
+VALUES ('P0')
+

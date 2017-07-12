@@ -1,0 +1,30 @@
+
+CREATE TABLE data AS SELECT i, clock_timestamp() as tt from generate_series(1,10) i(i);
+alter table data add primary key(i);
+
+CREATE TABLE data2 AS SELECT i, clock_timestamp() as tt from generate_series(1,10) i(i);
+alter table data2 add primary key(i);
+
+
+
+SELECT pglogical.create_node(
+    node_name := 'provider1',
+    dsn := 'host=localhost port=5432 dbname=test'
+);
+ create_node 
+-------------
+  2976894835
+(1 row)
+
+
+Subscriber:
+
+SELECT pglogical.create_node(
+    node_name := 'subscriber1',
+    dsn := 'host=thishost port=5432 dbname=db'
+);
+
+SELECT pglogical.create_subscription(
+    subscription_name := 'subscription1',
+    provider_dsn := 'host=providerhost port=5432 dbname=db'
+);

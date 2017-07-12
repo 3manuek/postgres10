@@ -1,0 +1,90 @@
+
+./pgaccess data1 percona
+CREATE TABLE queue (
+    id bigint PRIMARY KEY,
+    payload jsonb
+);
+CREATE SEQUENCE seq_queue AS bigint;
+select nextval('seq_queue');
+CREATE PUBLICATION p_queue
+FOR TABLE queue
+WITH (PUBLISH INSERT, NOPUBLISH UPDATE, NOPUBLISH DELETE);
+SELECT pg_create_logical_replication_slot('slot_queue', 'pgoutput');
+\q
+
+
+./pgaccess data2 percona 
+CREATE TABLE queue (
+    id bigint PRIMARY KEY,
+    server text DEFAULT 'data2',
+    payload jsonb
+);
+CREATE SUBSCRIPTION s_queue
+  CONNECTION 'port=6666 user=ubuntu dbname=percona' 
+  PUBLICATION p_queue 
+  WITH (NOCOPY DATA, NOCREATE SLOT,SLOT NAME = 'slot_queue');
+\q
+
+./pgaccess data3 percona 
+CREATE TABLE queue (
+    id bigint PRIMARY KEY,
+    server text DEFAULT 'data3',
+    payload jsonb
+);
+CREATE SUBSCRIPTION s_queue
+  CONNECTION 'port=6666 user=ubuntu dbname=percona' 
+  PUBLICATION p_queue 
+  WITH (NOCOPY DATA, NOCREATE SLOT,SLOT NAME = 'slot_queue');
+\q
+
+
+bin/psql -p6666 -x -c "select * from pg_replication_slots where slot_name = 'slot_queue'" percona ; 
+bin/psql -p6667 -x -c "select * from pg_subscription where subname = 's_queue'" percona
+bin/psql -p6668 -x -c "select * from pg_subscription where subname = 's_queue'" percona
+
+bin/psql -p6667 -x -c  "select * from pg_stat_subscription where subname = 's_queue';" percona
+bin/psql -p6668 -x -c  "select * from pg_stat_subscription where subname = 's_queue';" percona
+
+#!/bin/bash
+bin/psql -p6666 percona <<EOF
+INSERT INTO queue(id,payload) SELECT nextval('seq_queue'), \$\${"customer": "John Doe", "items": {"product": "Beer","qty": 6}}\$\$::jsonb;
+EOF
+
+watch --interval=1  ./dummy_ins.sh &
+
+bin/psql -p6667 -c "SELECT * FROM queue" percona
+bin/psql -p6668 -c "SELECT * FROM queue" percona 
+
+ALTER SUBSCRIPTION s_queue DISABLE;
+
+drop publication p_queue;
+drop subscription s_queue NODROP SLOT;
+drop subscription s_queue;
+
+
+
+----
+
+bin/psql -p6667 -c "select * from pg_replication_origin_status os join pg_replication_origin ON (local_id = roident)" percona
+bin/psql -p6668 -c "select * from pg_replication_origin_status os join pg_replication_origin ON (local_id = roident)" percona
+
+
+./pgaccess data2 percona 
+CREATE TABLE data (i integer PRIMARY KEY, tt timestamp with time zone);
+CREATE SUBSCRIPTION s_data 
+  CONNECTION 'port=6666 user=ubuntu dbname=percona' 
+  PUBLICATION p_data 
+  WITH (COPY DATA, NOCREATE SLOT,SLOT NAME = 's_data');
+SELECT * FROM data;
+drop subscription s_data NODROP SLOT;
+\q
+
+./pgaccess data3 percona 
+CREATE TABLE data (i integer PRIMARY KEY, tt timestamp with time zone);
+CREATE SUBSCRIPTION s_data 
+  CONNECTION 'port=6666 user=ubuntu dbname=percona' 
+  PUBLICATION p_data 
+  WITH (COPY DATA, NOCREATE SLOT,SLOT NAME = 's_data');
+SELECT * FROM data;
+drop subscription s_data NODROP SLOT;
+\q

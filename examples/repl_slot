@@ -6,3 +6,16 @@ SELECT * FROM pg_logical_slot_peek_changes('log_slot', NULL, NULL);
 SELECT * FROM pg_logical_slot_get_changes('log_slot', NULL, NULL);
 SELECT pg_drop_replication_slot('log_slot');
 DROP TABLE data;
+
+
+$ pg_recvlogical -d postgres --slot test --create-slot
+$ pg_recvlogical -d postgres --slot test --start -f -
+Control+Z
+$ psql -d postgres -c "INSERT INTO data(data) VALUES('4');"
+$ fg
+BEGIN 693
+table public.data: INSERT: id[integer]:4 data[text]:'4'
+COMMIT 693
+Control+C
+$ pg_recvlogical -d postgres --slot test --drop-slot
+
